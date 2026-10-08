@@ -1,0 +1,1 @@
+importScripts('./caffeine-proxy.js')

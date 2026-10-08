@@ -1,0 +1,10 @@
+{
+  "description": "Engage with advanced AI models through a user-friendly web interface, enabling seamless access to the Groq API for personalized interactions.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
