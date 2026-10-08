@@ -1,3 +1,5 @@
+import { allowedOrigin } from './deployment.mjs'
+
 const providers = {
   groq: { url: 'https://api.groq.com/openai/v1', key: () => process.env.groq || process.env.GROQ_API_KEY },
   pollinations: { url: 'https://gen.pollinations.ai/v1', key: () => process.env.pollinations || process.env.POLLINATIONS_API_KEY },
@@ -42,7 +44,7 @@ export async function handleGroq(request, response, authorized = () => true) {
   const pathname = new URL(request.url || '/', 'http://localhost').pathname
   if (!pathname.startsWith('/api/ai/')) return false
   if (!authorized(request)) { json(response, 401, { error: 'Unlock server access in Connection settings.' }); return true }
-  if (request.headers.origin && new URL(request.headers.origin).host !== request.headers.host) { json(response, 403, { error: 'Origin is not allowed.' }); return true }
+  if (!allowedOrigin(request)) { json(response, 403, { error: 'Origin is not allowed.' }); return true }
   if (pathname === '/api/ai/models' && request.method === 'GET') {
     const available = Object.keys(providers).filter(provider => providers[provider].key())
     if (!available.length) { json(response, 503, { error: 'AI is temporarily unavailable.' }); return true }

@@ -455,6 +455,7 @@ function Browser() {
   const [autoTranslate, setAutoTranslate] = useState(false)
   const [language, setLanguage] = useState("en")
   const [serverBundled, setServerBundled] = useState(false)
+  const [runtimeWisp, setRuntimeWisp] = useState("")
   const [passwordRequired, setPasswordRequired] = useState(false)
   const [serverAccess, setServerAccess] = useState(false)
   const [serverPassword, setServerPassword] = useState("")
@@ -542,7 +543,12 @@ function Browser() {
     }
     let cancelled = false
     setProxyReady(false)
-    initializeProxy(wisp)
+    let endpoint = wisp
+    try {
+      const saved = new URL(wisp || "/wisp/", location.origin)
+      if (saved.host === location.host && saved.pathname === "/wisp/") endpoint = runtimeWisp || wisp
+    } catch {}
+    initializeProxy(endpoint)
       .then(() => {
         if (!cancelled) {
           setProxyReady(true)
@@ -558,19 +564,20 @@ function Browser() {
     return () => {
       cancelled = true
     }
-  }, [profile?.id, wisp, serverAccess])
+  }, [profile?.id, wisp, serverAccess, runtimeWisp])
   useEffect(() => {
-    fetch(asset("api/runtime"))
+    fetch(`${asset("api/runtime")}?client=${encodeURIComponent(location.origin)}`, { cache: "no-store" })
       .then((response) => response.json())
       .then((data) => {
         if (data.bundledWisp === true) {
           setServerBundled(true)
+          setRuntimeWisp(typeof data.wispUrl === "string" ? data.wispUrl : "")
           setPasswordRequired(data.authenticationRequired === true)
           setServerAccess(data.authenticated === true)
         }
       })
       .catch(() => {})
-  }, [])
+  }, [serverAccess])
   useEffect(() => {
     const previous = Object.values(frameHandlers.current)
     previous.forEach(({ document, handler }) =>

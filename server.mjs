@@ -4,6 +4,7 @@ import { resolve, extname, sep } from 'node:path'
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { server as wisp } from '@mercuryworkshop/wisp-js/server'
 import { handleGroq } from './groq.mjs'
+import { allowedOrigin, publicWispUrl } from './deployment.mjs'
 
 const root = resolve('dist')
 // On PaaS hosts (Railway, Fly, Render) the container interface is private; always bind to all interfaces there.
@@ -63,9 +64,22 @@ const server = http.createServer(async (request, response) => {
     response.setHeader('X-Content-Type-Options', 'nosniff')
     if (await handleGroq(request, response, authorized)) return
     if (url.pathname.startsWith('/p/')) return sendJson(response, 503, { error: 'Proxy worker is not active. Reload Caffeine on HTTPS before browsing.' })
-    if (url.pathname === '/api/runtime') return sendJson(response, 200, { bundledWisp: true, authenticationRequired: !!password, authenticated: authorized(request) })
+    if (url.pathname === '/api/runtime') {
+      if (!allowedOrigin(request)) return sendJson(response, 403, { error: 'Origin is not allowed.' })
+      let wispUrl = publicWispUrl
+      if (wispUrl && password && authorized(request)) {
+        const endpoint = new URL(wispUrl)
+        const expiry = String(Date.now() + 8 * 60 * 60 * 1000)
+        const origin = url.searchParams.get('client') || request.headers.origin || `https://${request.headers.host}`
+        if (!allowedOrigin({ headers: { ...request.headers, origin } })) return sendJson(response, 403, { error: 'Origin is not allowed.' })
+        endpoint.searchParams.set('access', `${expiry}.${signature(`wisp:${origin}:${expiry}`)}`)
+        endpoint.searchParams.set('client', origin)
+        wispUrl = endpoint.href
+      }
+      return sendJson(response, 200, { bundledWisp: true, wispUrl, authenticationRequired: !!password, authenticated: authorized(request) })
+    }
     if (url.pathname === '/api/session' && request.method === 'POST') {
-      if (request.headers.origin && new URL(request.headers.origin).host !== request.headers.host) return sendJson(response, 403, { error: 'Origin is not allowed.' })
+      if (!allowedOrigin(request)) return sendJson(response, 403, { error: 'Origin is not allowed.' })
       const ip = request.socket.remoteAddress || 'unknown'
       const attempt = loginAttempts.get(ip) || { count: 0, start: Date.now() }
       if (Date.now() - attempt.start > 60000) { attempt.count = 0; attempt.start = Date.now() }
@@ -102,8 +116,11 @@ server.on('upgrade', (request, socket, head) => {
   const reject = status => { socket.write(`HTTP/1.1 ${status}\r\nConnection: close\r\n\r\n`); socket.destroy() }
   const url = new URL(request.url || '/', 'http://localhost')
   if (url.pathname !== '/wisp/') return reject('404 Not Found')
-  if (request.headers.origin && new URL(request.headers.origin).host !== request.headers.host) return reject('403 Forbidden')
-  if (!authorized(request)) return reject('401 Unauthorized')
+  if (!allowedOrigin(request)) return reject('403 Forbidden')
+  const [expiry, mac] = (url.searchParams.get('access') || '').split('.')
+  const client = url.searchParams.get('client')
+  const tokenAccess = client === request.headers.origin && expiry && mac && Number(expiry) > Date.now() && equal(signature(`wisp:${client}:${expiry}`), mac)
+  if (!authorized(request) && !tokenAccess) return reject('401 Unauthorized')
   const ip = request.socket.remoteAddress || 'unknown'
   if ((connections.get(ip) || 0) >= 32) return reject('429 Too Many Requests')
   connections.set(ip, (connections.get(ip) || 0) + 1)

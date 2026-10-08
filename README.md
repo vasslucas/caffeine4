@@ -1,5 +1,26 @@
 # Caffeine
 
+## Bunny CDN + Railway
+
+The Bunny Pull Zone `https://caffeine223.b-cdn.net` can serve the frontend from
+`https://caffeine4-production.up.railway.app`. Proxy WebSockets connect directly
+to Railway, not through the CDN. `/api/runtime` supplies the connection endpoint;
+existing saved same-host `/wisp/` settings automatically use it.
+
+On Railway, set `WISP_PUBLIC_URL=wss://caffeine4-production.up.railway.app/wisp/`
+and `PROXY_ALLOWED_ORIGINS=https://caffeine223.b-cdn.net,https://caffeine4-production.up.railway.app`.
+These are public configuration values, not API keys. Railway's public domain is
+also detected automatically. Different CDN domains must be added explicitly;
+arbitrary origins are not allowed. Password-protected hosts issue an expiring,
+origin-bound transport credential after server unlock; it is not saved in profiles.
+
+Keep Bunny's origin HTTPS and disable caching for `/api/*`, `/p/*`,
+`/caffeine-proxy.js`, `/controller/*`, `/scramjet/*`, and `/epoxy/*`.
+Forward cookies, query strings, and POST request bodies unchanged. Do not enable
+HTML/JavaScript rewriting or an HTML challenge for these paths. After deploying,
+purge the Pull Zone cache so old JavaScript does not keep connecting to CDN Wisp.
+The CDN hostname itself must serve HTTPS for service workers.
+
 ## AI workspace
 
 Use the **three-sparkle icon** to open AI in a Caffeine tab, or go directly to
