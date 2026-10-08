@@ -4,6 +4,9 @@ import type { Controller, Frame } from '@mercuryworkshop/scramjet-controller'
 const asset = (path: string) => `${import.meta.env.BASE_URL}${path}`
 let initialization: Promise<void> | undefined
 let controller: Controller | undefined
+let transportEndpoint = ''
+const engineVersion = '2.0.67-alpha.2-4'
+const scripts = new Map<string, Promise<void>>()
 const managedFrames = new WeakMap<HTMLIFrameElement, Frame>()
 let blocker = true
 const blockedDomains = ['doubleclick.net', 'googlesyndication.com', 'googleadservices.com', 'adnxs.com', 'adsrvr.org', 'scorecardresearch.com', 'connect.facebook.net', 'analytics.google.com', 'google-analytics.com', 'taboola.com', 'outbrain.com']
@@ -35,13 +38,16 @@ export function decodeProxied(href: string) {
 }
 
 async function loadScript(path: string) {
-  await new Promise<void>((resolve, reject) => {
+  if (scripts.has(path)) return scripts.get(path)
+  const promise = new Promise<void>((resolve, reject) => {
     const script = document.createElement('script')
-    script.src = asset(path)
+    script.src = `${asset(path)}?v=${engineVersion}`
     script.onload = () => resolve()
     script.onerror = () => { script.remove(); reject(new Error('Could not load the proxy engine.')) }
     document.head.append(script)
   })
+  scripts.set(path, promise)
+  try { await promise } catch (error) { scripts.delete(path); throw error }
 }
 
 export function navigateProxyFrame(element: HTMLIFrameElement, url: string) {
@@ -68,42 +74,53 @@ export function releaseProxyFrame(element: HTMLIFrameElement) {
 export async function initializeProxy(endpoint: string) {
   if (!window.isSecureContext || !navigator.serviceWorker)
     throw new Error('Browsing requires HTTPS or localhost with service worker support.')
+  const websocket = new URL(endpoint || '/wisp/', location.origin)
+  if (websocket.protocol === 'https:') websocket.protocol = 'wss:'
+  if (websocket.protocol === 'http:') websocket.protocol = 'ws:'
+  if (!['ws:', 'wss:'].includes(websocket.protocol)) throw new Error('Invalid connection URL.')
+  if (controller && initialization && transportEndpoint !== websocket.href) {
+    const transport = new FilteringTransport({ wisp: websocket.href })
+    await transport.init(); controller.setTransport(transport); transportEndpoint = websocket.href
+    return
+  }
   if (!initialization) initialization = (async () => {
     await loadScript('scramjet/scramjet.js')
     await loadScript('controller/controller.api.js')
-    const registration = await navigator.serviceWorker.register(asset('caffeine-proxy.js'), {
+    const registration = await navigator.serviceWorker.register(`${asset('caffeine-proxy.js')}?v=${engineVersion}`, {
       scope: import.meta.env.BASE_URL,
       updateViaCache: 'none',
     })
-    const updatingWorker = registration.installing || registration.waiting
     await new Promise<void>((resolve, reject) => {
+      const cleanup = () => { clearTimeout(timer); navigator.serviceWorker.removeEventListener('controllerchange', check); registration.removeEventListener('updatefound', watch); registration.installing?.removeEventListener('statechange', check); registration.waiting?.removeEventListener('statechange', check) }
       const timer = setTimeout(() => {
-        navigator.serviceWorker.removeEventListener('controllerchange', check)
-        reject(new Error('Proxy worker did not activate. Reload this page on an HTTPS host.'))
-      }, 12000)
+        cleanup(); reject(new Error('Connection did not activate. Refresh and try again.'))
+      }, 20000)
       function check() {
-        if (updatingWorker && updatingWorker.state !== 'activated') return
-        if (!navigator.serviceWorker.controller?.scriptURL.endsWith('/caffeine-proxy.js')) return
-        clearTimeout(timer)
-        navigator.serviceWorker.removeEventListener('controllerchange', check)
+        const active = navigator.serviceWorker.controller
+        if (!active || new URL(active.scriptURL).pathname !== new URL(asset('caffeine-proxy.js'), location.origin).pathname || active.state !== 'activated') return
+        if (registration.installing || registration.waiting) return
+        cleanup()
         resolve()
       }
+      function watch() { registration.installing?.addEventListener('statechange', check); check() }
+      registration.addEventListener('updatefound', watch)
+      registration.installing?.addEventListener('statechange', check)
+      registration.waiting?.addEventListener('statechange', check)
       navigator.serviceWorker.addEventListener('controllerchange', check)
       check()
     })
-    const websocket = new URL(endpoint || '/wisp/', location.href)
-    if (websocket.protocol === 'https:') websocket.protocol = 'wss:'
-    if (websocket.protocol === 'http:') websocket.protocol = 'ws:'
-    if (!['ws:', 'wss:'].includes(websocket.protocol)) throw new Error('Invalid Wisp WebSocket URL.')
+    const transport = new FilteringTransport({ wisp: websocket.href })
+    await transport.init()
+    transportEndpoint = websocket.href
     const { Controller } = await import('@mercuryworkshop/scramjet-controller')
     controller = new Controller({
       serviceworker: navigator.serviceWorker.controller!,
-      transport: new FilteringTransport({ wisp: websocket.href }),
+      transport,
       config: {
         prefix: '/p/',
-        scramjetPath: asset('scramjet/scramjet.js'),
-        wasmPath: asset('scramjet/scramjet.wasm'),
-        injectPath: asset('controller/controller.inject.js'),
+        scramjetPath: `${asset('scramjet/scramjet.js')}?v=${engineVersion}`,
+        wasmPath: `${asset('scramjet/scramjet.wasm')}?v=${engineVersion}`,
+        injectPath: `${asset('controller/controller.inject.js')}?v=${engineVersion}`,
       },
     })
     let timer: ReturnType<typeof setTimeout> | undefined

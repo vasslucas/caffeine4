@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Caveat:wght@400;600&family=Comfortaa:wght@400;600&family=Lora:wght@400;600&family=Nunito:wght@400;600;800&family=Pacifico&family=Playfair+Display:wght@400;600&family=Quicksand:wght@400;600&family=Space+Grotesk:wght@400;600&family=Space+Mono&display=swap');
 @import 'tailwindcss';
+@import './workspace.css';
 
 .browser-contents { display: contents }
 .ai-browser-link { display: flex; align-items: center; gap: 6px; padding: 7px 11px; border: 1px solid #ffffff18; border-radius: 7px; color: #b8dccf; font-size: 13px; background: #b8dccf08 }
@@ -164,7 +165,7 @@
   transform: none !important;
   z-index: 3;
 }
-.home-canvas:not(.editing) [data-widget^="shortcut:"] { max-width: calc(88vw / 6); }
+.home-canvas [data-widget^="shortcut:"] { max-width: calc(88vw / 6); }
 .bookmarks-bar .all-bookmarks { display: flex !important; flex-shrink: 0; }
 .add-widget-trigger { position: absolute; z-index: 6; left: 20px; top: 20px; display: flex; align-items: center; gap: 8px; padding: 13px 18px; background: #272833eb; border: 1px solid #ffffff25; border-radius: 12px; color: #f5f1ff; font-size: 12px; backdrop-filter: blur(20px); }
 .widget-picker { position: absolute; top: 76px; left: 20px; width: min(610px, calc(100% - 320px)); max-height: calc(100% - 95px); overflow-y: auto; z-index: 7; padding: 24px; background: #252630f5; border: 1px solid #ffffff25; border-radius: 20px; backdrop-filter: blur(25px); box-shadow: 0 20px 70px #0005; animation: panel-enter .25s ease; }
@@ -232,7 +233,8 @@
 .femboy-theme { font-family: Nunito, sans-serif; color: #66324e; background: #fff0f7; }
 .femboy-theme .chrome { background: #fff3f9; color: #703650; border-bottom: 1px solid #f2bcd5; }
 .femboy-theme :is(.tab-strip, .toolbar, .bookmarks-bar) { background: transparent; }
-.femboy-theme .tab.active { background: #f7c7df; color: #572d45; border-radius: 18px 18px 0 0; }
+.femboy-theme .tab { background: #ffeaf4; color: #75405e; }
+.femboy-theme .tab.selected { background: #f7c7df; color: #572d45; border-radius: 12px 12px 0 0; }
 .femboy-theme :is(.omnibox, .address-bar) { background: #fff; border-color: #f5c2db; color: #69344e; border-radius: 20px; }
 .femboy-theme .home-canvas { background: #fff0f7; }
 .femboy-theme .wallpaper { opacity: .07; filter: saturate(0) !important; }
@@ -244,18 +246,12 @@
 .pink-home-decoration > span:nth-child(3) { bottom: 17%; right: 3%; font-size: 90px; }
 .pink-home-decoration > p { position: absolute; top: 25px; left: 30px; font: 22px Caveat, cursive; }
 .femboy-theme .canvas-widget { color: #75405e !important; font-family: Nunito, sans-serif; }
-.femboy-theme .home-canvas:not(.editing) [data-widget="logo"] { left: 27% !important; top: 34% !important; width: min(400px, 44vw) !important; }
 .femboy-theme .hero-brand h1 { font-family: Nunito, sans-serif !important; font-weight: 800; letter-spacing: -3px; }
 .femboy-theme .hero-brand h1 > span { color: #e886b2; }
-.femboy-theme .home-canvas:not(.editing) [data-widget="tagline"] { left: 27% !important; top: 44% !important; width: min(400px, 44vw) !important; }
 .femboy-theme .hero-tagline { font: 25px Caveat, cursive !important; }
-.femboy-theme .home-canvas:not(.editing) [data-widget="search"] { left: 70% !important; top: 36% !important; width: min(520px, 48vw) !important; }
 .femboy-theme .hero-search { background: #ffffffde !important; border: 2px solid #f5bad7; border-radius: 24px !important; color: #854867 !important; box-shadow: 0 12px 0 #f6cce450; }
-.femboy-theme .home-canvas:not(.editing) [data-widget^="shortcut:"] { top: 63% !important; }
 .femboy-theme .shortcut-icon { background: #fff9fddd !important; border: 1px solid #f4bcd6 !important; box-shadow: 0 7px 0 #f4bfd955; border-radius: 20px !important; }
-.femboy-theme .home-canvas:not(.editing) [data-widget="clock"] { left: 27% !important; top: 77% !important; }
 .femboy-theme .clock > span { font-family: Quicksand, sans-serif !important; font-size: 42px; }
-.femboy-theme .home-canvas:not(.editing) [data-widget="date"] { left: 27% !important; top: 85% !important; }
 .femboy-theme .customize-button { background: #fff8fc !important; color: #8e426c !important; border: 1px solid #efb0d0; border-radius: 30px !important; }
 .femboy-theme :is(.modal, .canvas-editor, .profile-modal, .browser-menu, .widget-picker) { background: #fff4fa; color: #6d3653; border-color: #f5c0d9; box-shadow: 0 20px 60px #93426925; }
 .femboy-theme :is(.text-input, .font-picker summary, .font-options, .settings-nav, .settings-body input, .settings-body select, .canvas-editor select) { background: #fff; color: #733856; border-color: #f0c2d8; }
@@ -315,11 +311,6 @@
   .immersive-onboarding :is(.onboarding-progress, .onboarding-step) { margin-left: auto; margin-right: auto; width: 100%; max-width: 500px; }
   .immersive-onboarding .onboarding-progress { margin-top: 25px; }
   .immersive-onboarding .onboarding-step { padding-top: 14px; }
-  .femboy-theme .home-canvas:not(.editing) [data-widget="logo"] { left: 50% !important; top: 22% !important; width: 90vw !important; }
-  .femboy-theme .home-canvas:not(.editing) [data-widget="tagline"] { left: 50% !important; top: 32% !important; width: 90vw !important; }
-  .femboy-theme .home-canvas:not(.editing) [data-widget="search"] { left: 50% !important; top: 45% !important; width: 88vw !important; }
-  .femboy-theme .home-canvas:not(.editing) [data-widget="clock"] { left: 50% !important; top: 77% !important; }
-  .femboy-theme .home-canvas:not(.editing) [data-widget="date"] { left: 50% !important; top: 86% !important; }
   .pink-home-decoration > p { font-size: 17px; left: 20px; }
 }
 @media (max-width: 500px) {

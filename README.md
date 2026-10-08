@@ -2,13 +2,25 @@
 
 ## AI workspace
 
-Open **AI** in the browser toolbar, or go directly to `/ai`. Select a Groq chat
-model, send messages, switch models, and manage conversations saved on this
-device. Chat content is sent to Groq when you submit; local history is not cloud
+Use the **three-sparkle icon** to open AI in a Caffeine tab, or go directly to
+`/ai`. Select a Groq or Pollinations chat model and manage conversations on this
+device. Chat content is sent to the selected provider; local history is not cloud
 synced. Delete conversations with the trash button in the conversation list.
 
-On Railway, keep your API key in the **`groq`** service variable (lowercase,
-exactly as named). `GROQ_API_KEY` is also accepted. Redeploy after changing it.
+On Railway, keep your Groq API key in **`groq`** and your Pollinations API key
+in **`pollinations`**. `GROQ_API_KEY` and `POLLINATIONS_API_KEY` are also accepted.
+Redeploy after changing variables. Available models are fetched from each
+configured provider and grouped into General use, Coding, and Unfiltered.
+Only models explicitly labelled unfiltered by the provider appear in that
+category; ordinary models are not relabelled as uncensored. Provider moderation
+still applies. Catalog availability and billing depend on your provider account.
+
+Choose General, Coder, Professional, Friend, or Femboy personality presets.
+Attach up to four images or text/code files by upload, drop, or clipboard paste.
+Images are resized locally and accepted only by image-compatible models. Text
+files are limited to 64 KB; PDFs and other binary documents are not supported.
+Files sent in a message are shared with the selected AI provider. Attachments
+and chat history remain in local browser storage, subject to browser capacity.
 Never put the key in a `VITE_` variable: those are exposed in browser bundles.
 The existing Node server handles `/api/ai/models` and `/api/ai/chat` and forwards
 requests to Groq over HTTPS. Scramjet continues to proxy browser tabs; routing
@@ -17,11 +29,11 @@ uses the secure same-origin server relay instead.
 
 For local AI development, export `groq` in the terminal before `pnpm dev`.
 The Vite development middleware uses the same AI relay as the production server.
-Without a key, the UI displays a setup message rather than fake responses.
+Without a key, the UI displays an unavailable state rather than fake responses.
 
 **Protect a public deployment:** set a strong `PROXY_PASSWORD` (at least 12
 characters). AI respects the production server's existing access cookie and
-includes request size limits, model validation, a 60-second timeout, and basic
+includes request size limits, model validation, a 90-second timeout, and basic
 per-connection-IP rate limiting. Without a password, anyone reaching your site
 can spend your Groq quota. Railway may share a reverse-proxy IP across users;
 use authenticated per-user quotas for larger deployments.
@@ -41,6 +53,15 @@ and Tailwind CSS.
 
 ## Make it yours
 
+- Browser-reserved Ctrl/Cmd+T and Ctrl/Cmd+W cannot reliably be intercepted by
+  an ordinary website. Use **Alt+T**, **Alt+W**, **Alt+L**, **Alt+Shift+N**, and
+  **Alt+1–9** for Caffeine tabs; Ctrl/Cmd variants are handled when delivered
+  by the browser. The shortcuts also attach to same-origin proxy frames.
+- The cursor follows the active accent and supports dust, sparkles, hearts,
+  or bubbles in the customization panel. Trails honor reduced-motion settings.
+- The AI main pane uses the selected wallpaper or video, blurred; its sidebar
+  remains separate. Pink theme retains the same editable widget coordinates.
+
 - The home screen greets you by time of day, with a compact quick-travel row.
 - **Customize caffeine** is docked in the bottom-right. In edit mode, drag
   elements or use arrow keys (Shift for larger steps), then adjust their type,
@@ -52,8 +73,7 @@ and Tailwind CSS.
 - Notes, tasks, and widget values stay on this device, scoped to your profile.
   Remove a widget from the editor when you no longer want it on your canvas.
 - The **femboy-ify!** slider switches to an alternate pink, heart-accented layout.
-  Turn it off to restore the normal layout. Your choice is saved with your
-  profile; its small disclaimer appears once per browser installation.
+  Turn it off to restore the normal layout. Your choice is saved with your profile.
 - Typeface choices preview their actual fonts. Google Fonts need a network
   connection; system fonts depend on what is installed on your device.
 
@@ -97,6 +117,10 @@ If the service worker is absent, the server returns an explicit 503
 instead of serving the Caffeine application inside its own tab.
 
 After updating, reload the top-level Caffeine page to activate the new worker.
+Proxy engine assets and the service worker revalidate on every deployment;
+engine URLs are versioned to prevent mixed cached releases. Initialization waits
+for both worker activation and transport readiness, and transport changes are
+applied without losing existing frames. Use Retry connection if activation fails.
 If an older worker persists, unregister it in your browser's Application →
 Service Workers tools and reload. Static hosting can show the interface but
 cannot provide the bundled Wisp backend.

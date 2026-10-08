@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
-import { createBrowserRouter, RouterProvider, useLocation, useNavigate } from "react-router"
+import { createBrowserRouter, RouterProvider, useLocation } from "react-router"
 import AIPage from "./components/AIPage"
+import CursorTrail from "./components/CursorTrail"
 import FontPicker from "./components/FontPicker"
 import ExtraWidget, { widgetCatalog } from "./components/ExtraWidget"
 import {
@@ -13,6 +14,7 @@ import {
 const asset = (path: string) => `${import.meta.env.BASE_URL}${path}`
 
 type Tab = {
+  kind?: "ai"
   id: string
   title: string
   url: string
@@ -48,6 +50,12 @@ const wallpapers = [
     url: "https://images.unsplash.com/photo-1475924156734-496f6cac6ec1?auto=format&fit=crop&w=2400&q=90",
   },
   { name: "Midnight", url: "" },
+  { name: "Aurora", url: "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=2400&q=90" },
+  { name: "Dunes", url: "https://images.unsplash.com/photo-1509316785289-025f5b846b35?auto=format&fit=crop&w=2400&q=90" },
+  { name: "City lights", url: "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=2400&q=90" },
+  { name: "Wildflowers", url: "https://images.unsplash.com/photo-1490750967868-88aa4486c946?auto=format&fit=crop&w=2400&q=90" },
+  { name: "Moonlight", url: "https://images.unsplash.com/photo-1444703686981-a3abbc4d4fe3?auto=format&fit=crop&w=2400&q=90" },
+  { name: "Still water", url: "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=2400&q=90" },
 ]
 const newTab = (): Tab => ({
   id: crypto.randomUUID(),
@@ -73,6 +81,7 @@ type Widget = {
   font: string
 }
 type Home = {
+  trail?: string
   femboy?: boolean
   shadeColor?: string
   wallpaperZoom?: number
@@ -240,6 +249,7 @@ function Icon({ name, size = 18 }: {
   size?: number
 }) {
   const paths: Record<string, React.ReactNode> = {
+    sparkles: <path d="m10 3 2 5 5 2-5 2-2 5-2-5-5-2 5-2Zm9 12 1 3 3 1-3 1-1 3-1-3-3-1 3-1ZM4 2v4M2 4h4" />,
     plus: <path d="M12 5v14M5 12h14" />,
     close: <path d="m6 6 12 12M18 6 6 18" />,
     back: <path d="m14 5-7 7 7 7" />,
@@ -376,9 +386,8 @@ export default function App() {
 }
 
 function Browser() {
-  const isAI = useLocation().pathname === "/ai"
-  const navigatePage = useNavigate()
-  const [tabs, setTabs] = useState<Tab[]>([newTab()])
+  const initialAI = useLocation().pathname === "/ai"
+  const [tabs, setTabs] = useState<Tab[]>(() => [{ ...newTab(), ...(initialAI ? { kind: "ai" as const, title: "Caffeine AI" } : {}) }])
   const [activeId, setActiveId] = useState(tabs[0].id)
   const [address, setAddress] = useState("")
   const [panel, setPanel] = useState("")
@@ -423,11 +432,9 @@ function Browser() {
   const [now, setNow] = useState(new Date())
   const [shortcutName, setShortcutName] = useState("")
   const [shortcutUrl, setShortcutUrl] = useState("")
-  const [wallpaperPath, setWallpaperPath] = useState("")
   const [home, setHome] = useState<Home>(defaultHome)
   const [editing, setEditing] = useState(false)
   const [widgetPicker, setWidgetPicker] = useState(false)
-  const [themeNotice, setThemeNotice] = useState(false)
   const [selectedWidget, setSelectedWidget] = useState("logo")
   const [profiles, setProfiles] = useState<Profile[]>(() =>
     readStored("caffeine-profiles", []),
@@ -469,13 +476,15 @@ function Browser() {
   const frames = useRef<Record<string, HTMLIFrameElement | null>>({})
   const addressRef = useRef<HTMLInputElement>(null)
   const active = tabs.find((tab) => tab.id === activeId) || tabs[0]
+  const isAI = active.kind === "ai"
+  const cursor = `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="30" height="34" viewBox="0 0 30 34"><path d="M5 3v23l6-6 5 10 4-2-5-10h10Z" fill="${home.femboy ? "#e47bae" : accent}" stroke="#ffffff" stroke-width="1.2" stroke-linejoin="round"/></svg>`)}") 5 3, auto`
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
   useEffect(() => {
-    setAddress(active.url)
-  }, [active.url, activeId])
+    setAddress(isAI ? "caffeine://ai" : active.url)
+  }, [active.url, activeId, isAI])
   useEffect(() => {
     if (!profile) return
     const values = {
@@ -549,7 +558,7 @@ function Browser() {
     return () => {
       cancelled = true
     }
-  }, [profile?.id])
+  }, [profile?.id, wisp, serverAccess])
   useEffect(() => {
     fetch(asset("api/runtime"))
       .then((response) => response.json())
@@ -578,40 +587,52 @@ function Browser() {
   }, [profile?.id, autofill, logins, tabs.length, proxyReady])
   useEffect(() => {
     const listener = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === "l") {
+      const key = event.key.toLowerCase()
+      const command = event.ctrlKey || event.metaKey || event.altKey
+      if (command && key === "l") {
         event.preventDefault()
         addressRef.current?.focus()
         addressRef.current?.select()
       }
-      if ((event.ctrlKey || event.metaKey) && event.key === "t") {
+      if (command && key === "t") {
         event.preventDefault()
-        addTab()
+        addTab(event.shiftKey)
       }
       if (
-        (event.ctrlKey || event.metaKey) &&
+        command &&
         event.shiftKey &&
         event.key.toLowerCase() === "n"
       ) {
         event.preventDefault()
         addTab(true)
       }
-      if ((event.ctrlKey || event.metaKey) && event.key === "w") {
+      if (command && key === "w") {
         event.preventDefault()
         closeTab(activeId)
       }
+      if (event.altKey && key === "arrowleft") { event.preventDefault(); travel(-1) }
+      if (event.altKey && key === "arrowright") { event.preventDefault(); travel(1) }
+      if (command && key === "r") { event.preventDefault(); const frame = frames.current[activeId]; if (frame) { delete frame.dataset.caffeineTarget; navigateProxyFrame(frame, translatedUrl(active.url)) } }
+      if (event.altKey && /^[1-9]$/.test(key)) { event.preventDefault(); setActiveId(tabs[Math.min(Number(key) - 1, tabs.length - 1)].id) }
       if (event.key === "Escape") {
         setPanel("")
         setEditing(false)
       }
     }
-    window.addEventListener("keydown", listener)
-    return () => window.removeEventListener("keydown", listener)
+    window.addEventListener("keydown", listener, true)
+    const documents = Object.values(frames.current).flatMap(frame => { try { return frame?.contentDocument ? [frame.contentDocument] : [] } catch { return [] } })
+    documents.forEach(document => document.addEventListener("keydown", listener, true))
+    return () => { window.removeEventListener("keydown", listener, true); documents.forEach(document => document.removeEventListener("keydown", listener, true)) }
   })
   function addTab(isPrivate = active.private || false) {
     const tab = { ...newTab(), private: isPrivate }
     setTabs((previous) => [...previous, tab])
     setActiveId(tab.id)
     setPanel("")
+  }
+  function addAITab() {
+    const tab: Tab = { ...newTab(), kind: "ai", title: "Caffeine AI" }
+    setTabs(previous => [...previous, tab]); setActiveId(tab.id); setPanel("")
   }
   function closeTab(id: string) {
     setTabs((previous) =>
@@ -650,6 +671,7 @@ function Browser() {
           tab.id === activeId
             ? {
                 ...tab,
+                kind: undefined,
                 url,
                 title: parsed.hostname.replace("www.", ""),
                 history: [...tab.history.slice(0, tab.position + 1), url],
@@ -757,7 +779,9 @@ function Browser() {
       id,
       startX: event.clientX,
       startY: event.clientY,
-      x: widget.x,
+      x: !widget.manuallyPositioned && id.startsWith("shortcut:") && canvasRef.current
+        ? ((event.currentTarget.getBoundingClientRect().left + event.currentTarget.getBoundingClientRect().width / 2 - canvasRef.current.getBoundingClientRect().left) / canvasRef.current.getBoundingClientRect().width) * 100
+        : widget.x,
       y: widget.y,
     }
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -1338,12 +1362,6 @@ function Browser() {
   }
   function changeFemboyTheme(enabled: boolean) {
     setHome((previous) => ({ ...previous, femboy: enabled }))
-    if (enabled && !readStored("caffeine-theme-notice-seen", false)) {
-      setThemeNotice(true)
-      try {
-        localStorage.setItem("caffeine-theme-notice-seen", "true")
-      } catch {}
-    }
   }
   const range = (
     label: string,
@@ -1386,9 +1404,9 @@ function Browser() {
   )
   return (
     <div
-      className={`browser ${home.femboy ? "femboy-theme" : ""}`}
+      className={`browser ${home.femboy ? "femboy-theme" : ""} ${home.cursor ? "cursor-enabled" : ""}`}
       style={
-        { "--accent": home.femboy ? "#ff92c1" : accent } as React.CSSProperties
+        { "--accent": home.femboy ? "#e47bae" : accent, "--home-cursor": home.cursorImage ? `url("${home.cursorImage}") 8 8, auto` : cursor } as React.CSSProperties
       }
     >
       <header className="chrome">
@@ -1415,7 +1433,7 @@ function Browser() {
                     setPendingLogin(null)
                   }}
                 >
-                  {tab.private ? (
+                  {tab.kind === "ai" ? <Icon name="sparkles" size={15} /> : tab.private ? (
                     <Icon name="moon" size={15} />
                   ) : tab.url ? (
                     <img
@@ -1504,7 +1522,7 @@ function Browser() {
             />
           </form>
           <Tool icon="fullscreen" label="Fullscreen" onClick={fullscreen} />
-          <button className={`ai-browser-link ${isAI ? "active" : ""}`} onClick={() => { setPanel(""); navigatePage(isAI ? "/" : "/ai") }} aria-label={isAI ? "Return to browser" : "Open Caffeine AI"}>✧ <span>{isAI ? "Browser" : "AI"}</span></button>
+          <Tool icon="sparkles" label="Open AI in a new tab" onClick={addAITab} />
           <span className="toolbar-divider" />
           <Tool
             icon="shield"
@@ -1561,7 +1579,7 @@ function Browser() {
         )}
       </header>
       <main className="viewport">
-        {isAI && <AIPage onBack={() => navigatePage("/")} />}
+        {tabs.filter(tab => tab.kind === "ai").map(tab => <div key={tab.id} className={tab.id === activeId ? "ai-tab-view" : "ai-tab-view hidden"}><AIPage wallpaper={remoteImage(wallpaper)} video={video} accent={home.femboy ? "#e47bae" : accent} onBack={() => closeTab(tab.id)} /></div>)}
         <div className={isAI ? "hidden" : "browser-contents"}>
         {tabs.map(
           (tab) =>
@@ -1592,16 +1610,14 @@ function Browser() {
                   <div className="proxy-empty">
                     <Icon name="globe" size={38} />
                     <h2>Your next stop is ready.</h2>
-                    <p>Browsing runs through caffeine's built-in proxy.</p>
                     <code>{tab.url}</code>
                     <button
                       className="primary-button"
                       onClick={() => {
-                        setSettingsPage("Connection")
-                        setPanel("settings")
+                        initializeProxy(wisp).then(() => { setProxyReady(true); setError("") }).catch(err => setError(err.message))
                       }}
                     >
-                      Set up connection <Icon name="forward" size={15} />
+                      Retry connection <Icon name="reload" size={15} />
                     </button>
                   </div>
                 )}
@@ -1618,7 +1634,7 @@ function Browser() {
               {
                 "--home-cursor": home.cursorImage
                   ? `url("${home.cursorImage}") 8 8, auto`
-                  : `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='32' viewBox='0 0 28 32'%3E%3Cpath d='M3 2v23l6-6 5 10 4-2-5-10h9Z' fill='%23eee9fa' stroke='%239b80d1' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E") 3 2, auto`,
+                  : cursor,
               } as React.CSSProperties
             }
           >
@@ -1645,7 +1661,7 @@ function Browser() {
                   onError={() => {
                     setVideo("")
                     setError(
-                      "Video preset could not load. Check its filename in public/wallpapers/.",
+                      "This wallpaper could not load. Choose another.",
                     )
                   }}
                 />
@@ -1719,7 +1735,7 @@ function Browser() {
                     }`}
                     style={{
                       left:
-                        !editing && !widget.manuallyPositioned && id.startsWith("shortcut:")
+                        !widget.manuallyPositioned && id.startsWith("shortcut:")
                           ? `calc(50% + ${shortcuts.findIndex((shortcut) => id === `shortcut:${shortcut.domain}`) - (shortcuts.length - 1) / 2} * min(640px, 88vw) / ${Math.max(shortcuts.length, 1)})`
                           : `clamp(min(${(widget.width * widget.size) / 2}px, 46vw), ${widget.x}%, calc(100% - min(${(widget.width * widget.size) / 2}px, 46vw)))`,
                       top: `${widget.y}%`,
@@ -2004,6 +2020,7 @@ function Browser() {
                 {toggle("Custom cursor", home.cursor, () =>
                   setHome({ ...home, cursor: !home.cursor }),
                 )}
+                <label className="field-label">Cursor trail<select value={home.trail || "none"} onChange={event => setHome({ ...home, trail: event.target.value })}>{["none", "dust", "sparkles", "hearts", "bubbles"].map(value => <option key={value} value={value}>{value[0].toUpperCase() + value.slice(1)}</option>)}</select></label>
                 <label className="upload-button">
                   Upload cursor
                   <input
@@ -2180,30 +2197,6 @@ function Browser() {
           </button>
         </div>
       )}
-      {themeNotice && (
-        <div
-          className="theme-notice"
-          role="dialog"
-          aria-modal="true"
-          aria-label="A tiny disclaimer"
-          onKeyDown={(event) => {
-            if (event.key === "Escape") setThemeNotice(false)
-          }}
-        >
-          <div>
-            <span>♡</span>
-            <h2>not my idea btw</h2>
-            <p>Anyway… welcome to your pink era.</p>
-            <button
-              className="primary-button"
-              autoFocus
-              onClick={() => setThemeNotice(false)}
-            >
-              hehe, okay ♡
-            </button>
-          </div>
-        </div>
-      )}
       {panel === "menu" && (
         <>
           <button
@@ -2213,8 +2206,8 @@ function Browser() {
           />
           <div className="browser-menu">
             {[
-              ["plus", "New tab", "Ctrl T"],
-              ["moon", "New incognito tab", "Ctrl Shift N"],
+              ["plus", "New tab", "Alt T"],
+              ["moon", "New incognito tab", "Alt Shift N"],
               ["sliders", "Edit home screen", ""],
               ["coffee", "Profiles", ""],
               ["clock", "History", ""],
@@ -2376,31 +2369,6 @@ function Browser() {
                       <p className="hint">
                         Images or looping videos, saved locally to this profile.
                       </p>
-                      <form
-                        className="inline-form"
-                        onSubmit={(event) => {
-                          event.preventDefault()
-                          if (wallpaperPath) {
-                            setVideo(
-                              `/wallpapers/${wallpaperPath.replace(/^\/+/, "")}`,
-                            )
-                            setError("")
-                          }
-                        }}
-                      >
-                        <input
-                          value={wallpaperPath}
-                          onChange={(event) =>
-                            setWallpaperPath(event.target.value)
-                          }
-                          placeholder="Preset filename, e.g. alpine.mp4"
-                          aria-label="Video preset filename"
-                        />
-                        <button type="submit">Use</button>
-                      </form>
-                      <p className="hint">
-                        Add preset MP4s to public/wallpapers/.
-                      </p>
                       <p className="section-caption">Your signature color.</p>
                       <div className="accent-colors">
                         {[
@@ -2518,10 +2486,6 @@ function Browser() {
                         cannot be translated. Existing tabs refresh when the
                         language changes.
                       </p>
-                      <p className="hint">
-                        Built-in tools. Chrome CRX files cannot run in a web
-                        page.
-                      </p>
                       <div className="extension-card">
                         <Icon name="shield" size={25} />
                         <div>
@@ -2566,15 +2530,7 @@ function Browser() {
                   {settingsPage === "Connection" && (
                     <>
                       <p className="hint">
-                        Browsing uses Scramjet v2 to rewrite pages and Epoxy to
-                        connect to this host's bundled Wisp server. Deploy with
-                        pnpm build:host and pnpm start; a static-only preview
-                        can display the interface but cannot provide Wisp.
-                      </p>
-                      <p className="hint">
-                        {proxyReady
-                          ? "Proxy active. Sites load through this host."
-                          : "Proxy starting… open a site or reload once the service worker activates."}
+                        {proxyReady ? "Connection ready." : "Connecting…"}
                       </p>
                       {serverBundled && (passwordRequired || serverAccess) && (
                         <div className="bundled-connect">
@@ -2608,63 +2564,11 @@ function Browser() {
                           )}
                         </div>
                       )}
-                      <p className="hint">
-                        The preview host may restrict service workers. Deploy to
-                        HTTPS or localhost. Brand icons use an image proxy until
-                        the proxy is connected.
-                      </p>
                       {toggle(
                         "Load remote images through a proxy",
                         remoteImages,
                         () => setRemoteImages(!remoteImages),
                       )}
-                      <p className="hint">
-                        No direct image fallback: connected browsing uses the
-                        built-in proxy; the bundled host uses its own /api/image
-                        endpoint; static previews use images.weserv.nl. Uploaded
-                        images stay local. Turning this off hides remote images.
-                      </p>
-                      <details className="hosting-guide">
-                        <summary>Host at caffeine.lucasvass.uk</summary>
-                        <ol>
-                          <li>
-                            Use a Node host such as a VPS, Railway, or Render,
-                            not static-only Pages.
-                          </li>
-                          <li>
-                            Install with <code>pnpm install</code>, build with{" "}
-                            <code>pnpm build:host</code>, and start with{" "}
-                            <code>pnpm start</code>.
-                          </li>
-                          <li>
-                            Set <code>HOST=0.0.0.0</code>,{" "}
-                            <code>NODE_ENV=production</code>, and optionally{" "}
-                            <code>PROXY_PASSWORD</code> for password protection.
-                            Your host provides <code>PORT</code>.
-                          </li>
-                          <li>
-                            Attach <code>caffeine.lucasvass.uk</code> to the
-                            host. Add the CNAME or A record it specifies in
-                            Cloudflare DNS and enable HTTPS.
-                          </li>
-                          <li>
-                            No separate proxy server is needed — the included
-                            Node server provides /wisp/ WebSocket transport for
-                            Scramjet.
-                          </li>
-                        </ol>
-                        <p>
-                          Cloudflare Pages can serve the frontend, but the Wisp
-                          backend needs a real Node runtime, so a plain static
-                          host cannot browse for you.
-                        </p>
-                        <p>
-                          Use a dedicated subdomain rather than an iframe on
-                          your main site. Service worker registration is not
-                          reliable inside cross-site embeds. Your existing
-                          website can link to the subdomain.
-                        </p>
-                      </details>
                     </>
                   )}
                   {settingsPage === "Passwords" && (
@@ -2675,16 +2579,12 @@ function Browser() {
                         () => setAutofill(!autofill),
                       )}
                       <p className="hint">
-                        Opt-in, best-effort support for conventional login
-                        forms. Saved credentials are AES-GCM encrypted locally
-                        with a key derived from your profile password/PIN.
-                        Incognito never saves or fills them. A long password is
-                        much safer than a short PIN.
+                        Saved passwords are encrypted on this device. Incognito
+                        never saves them.
                       </p>
                       <p className="hint">
-                        A web proxy is not a hardened password manager. Do not
-                        store important or sensitive credentials here. Dynamic
-                        forms and translated pages may not support autofill.
+                        Avoid saving sensitive credentials. Some sites do not
+                        support autofill.
                       </p>
                       {logins.map((login) => (
                         <div className="list-row" key={login.id}>
@@ -2720,10 +2620,7 @@ function Browser() {
                       </p>
                       <p className="hint">Your internet. A little more you.</p>
                       <p className="hint">
-                        Powered by Scramjet & Bare Mux. A browser inside your
-                        browser, not a replacement for Chrome. Native CRX
-                        extensions, browser-level downloads and Chrome APIs are
-                        not available.
+                        A browser inside your browser, powered by Scramjet.
                       </p>
                     </div>
                   )}
@@ -2896,6 +2793,7 @@ function Browser() {
         >
           <section
             className="profile-modal"
+            onScroll={event => { const element = event.currentTarget; const progress = element.scrollTop / Math.max(1, element.scrollHeight - element.clientHeight); element.style.setProperty("--onboard-scroll", String(progress)); }}
             role="dialog"
             aria-modal="true"
             aria-label={
@@ -2923,7 +2821,7 @@ function Browser() {
                     <span />
                     <span />
                     <span />
-                    <small>your little escape</small>
+                    <small>caffeine · simplified proxy preview</small>
                   </div>
                   <div className="scene-window-content">
                     <span className="scene-coffee">☕</span>
@@ -2977,7 +2875,6 @@ function Browser() {
                 <Icon name="coffee" size={20} />
                 caffeine.
               </span>
-              {!profile && <button className="ai-browser-link" onClick={() => { setPanel(""); navigatePage("/ai") }}>✧ Try caffeine AI</button>}
               {profile && (
                 <Tool
                   icon="close"
@@ -3012,7 +2909,7 @@ function Browser() {
                     </h2>
                     {profiles.length === 0 && (
                       <p className="official-proxy">
-                        crypted’s official proxy.
+                        Made by 34ms / lucas.
                       </p>
                     )}
                     <form
@@ -3184,26 +3081,6 @@ function Browser() {
                       <br />
                       Your rules.
                     </h2>
-                    <p className="hint">
-                      The canvas works immediately. Browsing runs through
-                      caffeine's built-in proxy as soon as your profile opens.
-                    </p>
-                    {serverBundled ? (
-                      <div className="setup-included">
-                        <Icon name="shield" size={25} />
-                        <div>
-                          <strong>Proxy is already included.</strong>
-                          <p>
-                            This host includes the Wisp backend — no separate
-                            server needed.
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="hint">
-                        Hosting instructions are ready in Settings → Connection.
-                      </p>
-                    )}
                     {toggle("Block ads & trackers", extensions.blocker, () =>
                       setExtensions({
                         ...extensions,
@@ -3314,15 +3191,14 @@ function Browser() {
                     <button onClick={lockProfile}>Lock profile</button>
                   )}
                 </div>
-                <p className="hint">
-                  Profiles are local conveniences, not isolated Chrome accounts.
-                  Keep this site on its own subdomain.
-                </p>
+                <p className="hint">Profiles stay on this device. Website cookies are shared.</p>
               </div>
             )}
+            {profiles.length === 0 && <footer className="onboarding-credit"><span>Make yourself at home.</span></footer>}
           </section>
         </div>
       )}
+      <CursorTrail style={home.trail || "none"} accent={home.femboy ? "#e47bae" : accent} />
     </div>
   )
 }

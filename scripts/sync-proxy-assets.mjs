@@ -4,6 +4,7 @@ import { copyFile, mkdir } from 'node:fs/promises'
 
 const require = createRequire(import.meta.url)
 for (const [packageName, folder, files] of [
+  ['@mercuryworkshop/epoxy-transport', 'epoxy', ['index.mjs']],
   ['@mercuryworkshop/scramjet', 'scramjet', ['scramjet.js', 'scramjet.wasm']],
   ['@mercuryworkshop/scramjet-controller', 'controller', ['controller.api.js', 'controller.inject.js', 'controller.sw.js']],
 ]) {

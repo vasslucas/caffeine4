@@ -92,7 +92,8 @@ const server = http.createServer(async (request, response) => {
     let information
     try { information = await stat(file); if (information.isDirectory()) file = resolve(file, 'index.html') } catch { if (extname(file) || url.pathname.startsWith('/api/')) return sendJson(response, 404, { error: 'Not found.' }); file = resolve(root, 'index.html') }
     const body = await readFile(file)
-    response.writeHead(200, { 'Content-Type': mime[extname(file)] || 'application/octet-stream', 'Cache-Control': extname(file) === '.html' || file.endsWith('proxy-sw.js') ? 'no-cache' : 'public, max-age=3600' })
+    const engineAsset = ['/scramjet/', '/controller/', '/epoxy/'].some(prefix => url.pathname.startsWith(prefix)) || /\/(caffeine-proxy|proxy-sw)\.js$/.test(url.pathname)
+    response.writeHead(200, { 'Content-Type': mime[extname(file)] || 'application/octet-stream', 'Cache-Control': extname(file) === '.html' || engineAsset ? 'no-cache' : 'public, max-age=3600', ...(url.pathname.endsWith('caffeine-proxy.js') ? { 'Service-Worker-Allowed': '/' } : {}) })
     response.end(request.method === 'HEAD' ? undefined : body)
   } catch { if (!response.headersSent) sendJson(response, 502, { error: 'Resource unavailable.' }); else response.end() }
 })
